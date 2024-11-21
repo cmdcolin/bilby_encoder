@@ -12,18 +12,20 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio import pairwise2
-#from Bio.pairwise2 import format_alignment
+
+# from Bio.pairwise2 import format_alignment
 import pysam
+
 
 # TODO: generate_splice_structure()?
 def generate_gene(splice_structure: list[int]) -> tuple[str, str]:
     """
-    Generates a "realistic" gene sequence with intron and exon regions based on a specified 
+    Generates a "realistic" gene sequence with intron and exon regions based on a specified
     structure.
 
-    This function simulates a gene sequence by generating nucleotide sequences for introns 
-    and exons according to a given structure. Introns are flanked by canonical "GT...AG" splice 
-    sites. Exons are included both in the full gene sequence and in a separate "read" sequence 
+    This function simulates a gene sequence by generating nucleotide sequences for introns
+    and exons according to a given structure. Introns are flanked by canonical "GT...AG" splice
+    sites. Exons are included both in the full gene sequence and in a separate "read" sequence
     containing only exons.
 
     Parameters:
@@ -37,15 +39,15 @@ def generate_gene(splice_structure: list[int]) -> tuple[str, str]:
     Returns:
     -------
     tuple of (str, str)
-        - gene_sequence: A string representing the nucleotide sequence of the gene, 
+        - gene_sequence: A string representing the nucleotide sequence of the gene,
           including introns and exons.
-        - exon_sequence: A string representing the nucleotide sequence of the exons 
+        - exon_sequence: A string representing the nucleotide sequence of the exons
           only (the "read").
 
     Raises:
     ------
     ValueError
-        If the length of `splice_structure` is not odd, if any exon length (elements at even 
+        If the length of `splice_structure` is not odd, if any exon length (elements at even
         indices) is less than 1 nucleotide, or if any intron length (elements at odd indices)
         is less than 4 nucleotides.
 
@@ -56,16 +58,18 @@ def generate_gene(splice_structure: list[int]) -> tuple[str, str]:
 
     Notes:
     -----
-    - Each intron is generated with a minimum length of 4 nucleotides, and is flanked by "GT" 
+    - Each intron is generated with a minimum length of 4 nucleotides, and is flanked by "GT"
       and "AG" to represent canonical splice donor and acceptor sites.
-    - Exon sequences are directly appended to the "exon_sequence", while both introns and exons 
+    - Exon sequences are directly appended to the "exon_sequence", while both introns and exons
       are added to the full "gene_sequence".
     - The output is randomized, so nucleotide sequences will differ on each function call.
     """
 
     if len(splice_structure) % 2 != 1:
-        raise ValueError("The splice structure must contain an odd number of"
-                         "segments, alternating between exons and introns.")
+        raise ValueError(
+            "The splice structure must contain an odd number of"
+            "segments, alternating between exons and introns."
+        )
 
     if any(splice_structure[i] < 1 for i in range(0, len(splice_structure), 2)):
         raise ValueError("Exons must be at least 1 nucleotide long.")
@@ -73,34 +77,37 @@ def generate_gene(splice_structure: list[int]) -> tuple[str, str]:
     if any(splice_structure[i] < 4 for i in range(1, len(splice_structure), 2)):
         raise ValueError("Introns must be at least 4 nucleotides long.")
 
-    nucleotides = np.array(['A', 'T', 'C', 'G'])
+    nucleotides = np.array(["A", "T", "C", "G"])
     gene_segments, exon_segments = [], []
 
     is_exon = True
     for splice_size in splice_structure:
         if is_exon:
             # Generate exon sequence
-            exon_seq = ''.join(np.random.choice(nucleotides, splice_size))
+            exon_seq = "".join(np.random.choice(nucleotides, splice_size))
             exon_segments.append(exon_seq)
             gene_segments.append(exon_seq)
         else:
             # Generate intron sequence with canonical splice sites
-            intron_seq = 'GT' + ''.join(np.random.choice(nucleotides, splice_size - 4)) + 'AG'
+            intron_seq = (
+                "GT" + "".join(np.random.choice(nucleotides, splice_size - 4)) + "AG"
+            )
             gene_segments.append(intron_seq)
 
         is_exon = not is_exon
 
     # Join segments into final sequences
-    gene_sequence = ''.join(gene_segments)
-    exon_sequence = ''.join(exon_segments)
+    gene_sequence = "".join(gene_segments)
+    exon_sequence = "".join(exon_segments)
 
     return gene_sequence, exon_sequence
+
 
 def random_non_negative_int_array_sum_to_n(n: int, size: int) -> np.ndarray[int]:
     """
     Generates an array of non-negative integers that sum to a specified target value.
 
-    This function divides the target integer `n` into `size` non-negative integer values 
+    This function divides the target integer `n` into `size` non-negative integer values
     that add up to `n`. The distribution of values is random and non-negative, providing
     a way to split a total sum randomly across a specified number of elements.
 
@@ -148,28 +155,29 @@ def random_non_negative_int_array_sum_to_n(n: int, size: int) -> np.ndarray[int]
 
     return values
 
+
 def generate_genome(genes: list[str], size: int) -> str:
     """
-    Generates a "realistic" genome sequence with genes interspersed with random-length 
+    Generates a "realistic" genome sequence with genes interspersed with random-length
     non-coding regions, adjusted to a specified total genome size.
 
-    This function creates a genome by arranging given gene sequences with randomly sized 
-    non-coding regions between them. The resulting genome is padded as needed with additional 
+    This function creates a genome by arranging given gene sequences with randomly sized
+    non-coding regions between them. The resulting genome is padded as needed with additional
     non-coding sequence to achieve the exact specified size.
 
     Parameters:
     ----------
     genes : list of str
-        List of gene sequences (strings) to be included in the genome. Each gene is assumed 
+        List of gene sequences (strings) to be included in the genome. Each gene is assumed
         to be a nucleotide sequence.
     size : int
-        The total length of the genome to be generated. Must be at least as long as the 
+        The total length of the genome to be generated. Must be at least as long as the
         total length of the gene sequences.
 
     Returns:
     -------
     str
-        A nucleotide sequence representing the genome, with genes separated and padded 
+        A nucleotide sequence representing the genome, with genes separated and padded
         by non-coding sequences to reach the specified size.
 
     Raises:
@@ -194,35 +202,44 @@ def generate_genome(genes: list[str], size: int) -> str:
 
     genes_length = sum(len(gene) for gene in genes)
     if genes_length > size:
-        raise ValueError("Total length of genes cannot exceed the specified genome size.")
+        raise ValueError(
+            "Total length of genes cannot exceed the specified genome size."
+        )
 
     # Calculate the total length needed for non-coding regions
     non_coding_length = size - genes_length
 
     # Generate random non-coding region lengths that sum to `non_coding_length`
-    non_coding_regions = random_non_negative_int_array_sum_to_n(non_coding_length, num_genes + 1)
+    non_coding_regions = random_non_negative_int_array_sum_to_n(
+        non_coding_length, num_genes + 1
+    )
 
-    nucleotides = np.array(['A', 'T', 'C', 'G'])
+    nucleotides = np.array(["A", "T", "C", "G"])
     genome_segments = []
 
     # Construct the genome by alternating non-coding regions and genes
     for i in range(num_genes):
-        genome_segments.append(''.join(np.random.choice(nucleotides, non_coding_regions[i])))
+        genome_segments.append(
+            "".join(np.random.choice(nucleotides, non_coding_regions[i]))
+        )
         genome_segments.append(genes[i])
     # Add the final non-coding region
-    genome_segments.append(''.join(np.random.choice(nucleotides, non_coding_regions[-1])))
+    genome_segments.append(
+        "".join(np.random.choice(nucleotides, non_coding_regions[-1]))
+    )
 
     # Join all parts into the final genome sequence
-    genome_sequence = ''.join(genome_segments)
+    genome_sequence = "".join(genome_segments)
 
     return genome_sequence
+
 
 def random_contiguous_substring(string: str, length: int) -> str:
     """
     Generates a random contiguous substring of a specified length from the given string.
 
     This function selects a random starting position in the input string, ensuring that
-    the selected substring has the desired length. It returns a contiguous substring 
+    the selected substring has the desired length. It returns a contiguous substring
     of the specified length, which is drawn from the given string.
 
     Parameters:
@@ -251,25 +268,28 @@ def random_contiguous_substring(string: str, length: int) -> str:
 
     Notes:
     -----
-    - If the `length` is equal to the length of the string, the function will return 
+    - If the `length` is equal to the length of the string, the function will return
       the entire string.
     - The returned substring is drawn randomly, so it will differ on each function call.
     """
 
     if length > len(string):
-        raise ValueError("The desired substring length cannot exceed the"
-                         "length of the original string.")
+        raise ValueError(
+            "The desired substring length cannot exceed the"
+            "length of the original string."
+        )
 
     # Randomly select a starting index within bounds that allow for a substring of the given length
     start_idx = np.random.randint(0, len(string) - length + 1)
-    return string[start_idx:start_idx + length]
+    return string[start_idx : start_idx + length]
+
 
 def generate_reads(exon_sequences: list[str], read_counts: list[int]) -> list[str]:
     """
     Generate random reads from the exon sequences of genes.
 
-    This function generates random subsequences (reads) from each of the provided exon sequences. 
-    The number of each reads generated for each exon sequence is defined by the corresponding entry 
+    This function generates random subsequences (reads) from each of the provided exon sequences.
+    The number of each reads generated for each exon sequence is defined by the corresponding entry
     in the `read_counts` list. Each read is randomly is extracted from the respective exon sequence.
 
     Parameters:
@@ -277,7 +297,7 @@ def generate_reads(exon_sequences: list[str], read_counts: list[int]) -> list[st
     exon_sequences : list of str
         A list of exon sequences (strings), each corresponding to a different gene.
     read_counts : list of int
-        A list of integers specifying how many reads to generate from each exon sequence. 
+        A list of integers specifying how many reads to generate from each exon sequence.
         The length of this list must match `exon_sequences`.
 
     Returns:
@@ -303,12 +323,13 @@ def generate_reads(exon_sequences: list[str], read_counts: list[int]) -> list[st
     """
 
     if len(exon_sequences) != len(read_counts):
-        raise ValueError("The length of `exon_sequences` must match the length of `read_counts`.")
+        raise ValueError(
+            "The length of `exon_sequences` must match the length of `read_counts`."
+        )
 
     # Generate random reads
     reads = []
     for exon_seq, count in zip(exon_sequences, read_counts):
-
         # Ensure valid read counts
         if count < 1:
             raise ValueError("Each `read_count` must be greater than zero.")
@@ -320,6 +341,7 @@ def generate_reads(exon_sequences: list[str], read_counts: list[int]) -> list[st
             reads.append(read)
 
     return reads
+
 
 def partition_reads(reads: list[str], num_partitions: int) -> list[list[str]]:
     """
@@ -347,8 +369,14 @@ def partition_reads(reads: list[str], num_partitions: int) -> list[list[str]]:
     # Convert numpy arrays to lists and return
     return [list(partition) for partition in partitions]
 
-def save_test_case(data_dir: str, test_case_name: str, genome: str, reads: list[list[str]],
-                   windows: list[list[tuple[str, int, int]]]) -> None:
+
+def save_test_case(
+    data_dir: str,
+    test_case_name: str,
+    genome: str,
+    reads: list[list[str]],
+    windows: list[list[tuple[str, int, int]]],
+) -> None:
     """
     Save test case data including genome, reads, and windows in FASTA, BAM, and BED formats.
 
@@ -356,9 +384,9 @@ def save_test_case(data_dir: str, test_case_name: str, genome: str, reads: list[
     - data_dir (str): Base directory for storing test cases.
     - test_case_name (str): Name of the test case, used as a subdirectory within data_dir.
     - genome (str): Reference genome sequence to save as a FASTA file.
-    - reads (list[list[str]]): Nested list of read sequences; each inner list represents 
+    - reads (list[list[str]]): Nested list of read sequences; each inner list represents
       reads for a specific file.
-    - windows (list[list[tuple[str, int, int]]]): Nested list of genomic intervals 
+    - windows (list[list[tuple[str, int, int]]]): Nested list of genomic intervals
       as (chrom, start, end) tuples for each file.
 
     The function generates:
@@ -393,8 +421,10 @@ def save_test_case(data_dir: str, test_case_name: str, genome: str, reads: list[
     # Write BAM files with aligned reads for each set of reads
     # TODO: this is super hack-y - there has to be a better way to do small alignments
     bam_contents = generate_bam_file_contents(reads, genome)
-    bam_header = { 'HD': {'VN': '1.0', 'SO':'unsorted'},
-                   'SQ': [{'LN': len(genome), 'SN': 'chr1'}] }
+    bam_header = {
+        "HD": {"VN": "1.0", "SO": "unsorted"},
+        "SQ": [{"LN": len(genome), "SN": "chr1"}],
+    }
 
     for i, bam_file_contents in enumerate(bam_contents):
         bam_path = os.path.join(testcase_directory, f"alignment{i}.bam")
@@ -413,10 +443,13 @@ def save_test_case(data_dir: str, test_case_name: str, genome: str, reads: list[
     # Write BED files specifying genomic windows
     for i, file_windows in enumerate(windows):
         bed_path = os.path.join(testcase_directory, f"windows{i}.bed")
-        bed_df = pd.DataFrame(file_windows, columns=['chrom', 'start', 'end'])
-        bed_df.to_csv(bed_path, sep='\t', index=False)
+        bed_df = pd.DataFrame(file_windows, columns=["chrom", "start", "end"])
+        bed_df.to_csv(bed_path, sep="\t", index=False)
 
-def generate_bam_file_contents(reads: list[list[str]], genome: str) -> list[list[tuple[int, list[tuple[int, int]]]]]:
+
+def generate_bam_file_contents(
+    reads: list[list[str]], genome: str
+) -> list[list[tuple[int, list[tuple[int, int]]]]]:
     """
     Generate BAM file contents by aligning reads to the reference genome.
 
@@ -431,7 +464,6 @@ def generate_bam_file_contents(reads: list[list[str]], genome: str) -> list[list
 
     # Perform local alignments for each query
     for file_reads in reads:
-
         file_contents = []
 
         for read in file_reads:
@@ -446,9 +478,10 @@ def generate_bam_file_contents(reads: list[list[str]], genome: str) -> list[list
 
     return contents
 
+
 def process_alignment_sequence(alignment) -> str:
     """
-    Process alignment sequence by stripping unaligned nucleotides and converting 
+    Process alignment sequence by stripping unaligned nucleotides and converting
     to CIGAR-like symbols.
 
     Parameters:
@@ -457,8 +490,9 @@ def process_alignment_sequence(alignment) -> str:
     Returns:
     - str: Sequence with 'M' for matches and 'N' for gaps.
     """
-    aligned_seq = alignment.seqB.strip('-')
-    return re.sub(r'[ATCG]', 'M', aligned_seq).replace('-', 'N')
+    aligned_seq = alignment.seqB.strip("-")
+    return re.sub(r"[ATCG]", "M", aligned_seq).replace("-", "N")
+
 
 def run_length_encoding(data: str) -> list[tuple[int, int]]:
     """
@@ -470,5 +504,7 @@ def run_length_encoding(data: str) -> list[tuple[int, int]]:
     Returns:
     - list[tuple[int, int]]: List of (CIGAR operation, run length).
     """
-    cigar_code_dict = {'M': 0, 'N': 3}
-    return [(cigar_code_dict[char], sum(1 for _ in group)) for char, group in groupby(data)]
+    cigar_code_dict = {"M": 0, "N": 3}
+    return [
+        (cigar_code_dict[char], sum(1 for _ in group)) for char, group in groupby(data)
+    ]
